@@ -1,0 +1,152 @@
+<!doctype html>
+<html lang="vi">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
+    <title>Dự đoán Bệnh Tim Mạch V2</title>
+    <style>
+        /* Giữ nguyên CSS từ phiên bản trước */
+        body { font-family: sans-serif; padding: 20px; line-height: 1.6; }
+        .container { max-width: 750px; margin: auto; background-color: #f8f9fa; padding: 30px; border-radius: 8px; box-shadow: 0 0 10px rgba(0,0,0,0.1); }
+        h1 { color: #dc3545; text-align: center; margin-bottom: 20px;}
+        label { display: block; margin-bottom: 5px; font-weight: bold; color: #495057; }
+        input[type="number"], select {
+            width: 100%; padding: 10px; margin-bottom: 15px; box-sizing: border-box;
+            border: 1px solid #ced4da; border-radius: 4px; font-size: 1em;
+        }
+        input[type="submit"] {
+            display: block; width: 100%; padding: 12px 15px; background-color: #dc3545; color: white;
+            border: none; cursor: pointer; font-size: 1.1em; border-radius: 4px; transition: background-color 0.2s;
+        }
+        input[type="submit"]:hover { background-color: #c82333; }
+        .result { margin-top: 30px; padding: 20px; border-radius: 5px; text-align: center; }
+        .result.positive { border: 2px solid #dc3545; background-color: #f8d7da; color: #721c24; }
+        .result.negative { border: 2px solid #28a745; background-color: #d4edda; color: #155724; }
+        .result h2 { margin-top: 0; }
+        .error { color: #721c24; background-color: #f8d7da; border: 1px solid #f5c6cb; padding: 10px; border-radius: 4px; margin-top: 15px; }
+        .input-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px; margin-bottom: 20px; }
+        .form-group { margin-bottom: 0; }
+        .model-info { font-size: 0.85em; color: #6c757d; text-align: center; margin-top: 10px; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Dự đoán Nguy cơ Mắc Bệnh Tim Mạch</h1>
+        <p style="text-align: center; margin-bottom: 25px;">Nhập các chỉ số sức khỏe của bệnh nhân để dự đoán khả năng mắc bệnh tim.</p>
+
+        <form method="post">
+            <div class="input-grid">
+                <!-- Các ô nhập số liệu -->
+                <div class="form-group">
+                    <label for="age">Tuổi (age):</label>
+                    <input type="number" id="age" name="age" required value="{{ request.form.age if request else '' }}" placeholder="Ví dụ: 63">
+                </div>
+                <div class="form-group">
+                    <label for="trestbps">Huyết áp nghỉ (trestbps) (mmHg):</label>
+                    <input type="number" id="trestbps" name="trestbps" required value="{{ request.form.trestbps if request else '' }}" placeholder="Ví dụ: 145">
+                </div>
+                <div class="form-group">
+                    <label for="chol">Cholesterol (chol) (mg/dl):</label>
+                    <input type="number" id="chol" name="chol" required value="{{ request.form.chol if request else '' }}" placeholder="Ví dụ: 233">
+                </div>
+                 <div class="form-group">
+                    <label for="thalch">Nhịp tim tối đa (thalch):</label>
+                    <input type="number" id="thalch" name="thalch" required value="{{ request.form.thalch if request else '' }}" placeholder="Ví dụ: 150">
+                </div>
+                <div class="form-group">
+                    <label for="oldpeak">ST depression khi gắng sức (oldpeak):</label>
+                    <input type="number" id="oldpeak" name="oldpeak" step="any" required value="{{ request.form.oldpeak if request else '' }}" placeholder="Ví dụ: 2.3">
+                </div>
+                 <div class="form-group">
+                    <label for="ca">Số mạch chính nhuộm màu (ca) (0-4):</label>
+                    <input type="number" id="ca" name="ca" min="0" max="4" step="1" required value="{{ request.form.ca if request else '' }}" placeholder="Ví dụ: 0">
+                </div>
+
+                <!-- Các ô chọn giá trị phân loại -->
+                <div class="form-group">
+                    <label for="sex">Giới tính (sex):</label>
+                    <select id="sex" name="sex" required>
+                        <option value="" disabled {{ 'selected' if not request or not request.form.sex }}>-- Chọn giới tính --</option>
+                        <option value="Male" {{ 'selected' if request and request.form.sex == 'Male' }}>Nam (Male)</option>
+                        <option value="Female" {{ 'selected' if request and request.form.sex == 'Female' }}>Nữ (Female)</option>
+                    </select>
+                </div>
+                 <div class="form-group">
+                    <label for="cp">Loại đau ngực (cp):</label>
+                    <select id="cp" name="cp" required>
+                        <option value="" disabled {{ 'selected' if not request or not request.form.cp }}>-- Chọn loại đau ngực --</option>
+                        <option value="typical angina" {{ 'selected' if request and request.form.cp == 'typical angina' }}>Đau thắt ngực điển hình (typical angina)</option>
+                        <option value="atypical angina" {{ 'selected' if request and request.form.cp == 'atypical angina' }}>Đau thắt ngực không điển hình (atypical angina)</option>
+                        <option value="non-anginal" {{ 'selected' if request and request.form.cp == 'non-anginal' }}>Đau không do thắt ngực (non-anginal)</option>
+                        <option value="asymptomatic" {{ 'selected' if request and request.form.cp == 'asymptomatic' }}>Không triệu chứng (asymptomatic)</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label for="fbs">Đường huyết lúc đói > 120 mg/dl (fbs):</label>
+                    <select id="fbs" name="fbs" required>
+                        <option value="" disabled {{ 'selected' if not request or request.form.fbs is none }}>-- Chọn --</option>
+                        <!-- Giá trị phải là 'TRUE' hoặc 'FALSE' như trong file CSV -->
+                        <option value="TRUE" {{ 'selected' if request and request.form.fbs == 'TRUE' }}>Đúng (> 120)</option>
+                        <option value="FALSE" {{ 'selected' if request and request.form.fbs == 'FALSE' }}>Sai (<= 120)</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label for="restecg">Điện tâm đồ lúc nghỉ (restecg):</label>
+                    <select id="restecg" name="restecg" required>
+                        <option value="" disabled {{ 'selected' if not request or not request.form.restecg }}>-- Chọn kết quả ECG --</option>
+                        <option value="normal" {{ 'selected' if request and request.form.restecg == 'normal' }}>Bình thường (normal)</option>
+                        <option value="st-t abnormality" {{ 'selected' if request and request.form.restecg == 'st-t abnormality' }}>Bất thường sóng ST-T (st-t abnormality)</option>
+                        <option value="lv hypertrophy" {{ 'selected' if request and request.form.restecg == 'lv hypertrophy' }}>Phì đại thất trái (lv hypertrophy)</option>
+                    </select>
+                </div>
+                 <div class="form-group">
+                    <label for="exang">Đau ngực khi gắng sức (exang):</label>
+                    <select id="exang" name="exang" required>
+                         <option value="" disabled {{ 'selected' if not request or request.form.exang is none }}>-- Chọn --</option>
+                         <!-- Giá trị phải là 'TRUE' hoặc 'FALSE' -->
+                        <option value="TRUE" {{ 'selected' if request and request.form.exang == 'TRUE' }}>Có</option>
+                        <option value="FALSE" {{ 'selected' if request and request.form.exang == 'FALSE' }}>Không</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label for="slope">Độ dốc đoạn ST (slope):</label>
+                    <select id="slope" name="slope" required>
+                         <option value="" disabled {{ 'selected' if not request or not request.form.slope }}>-- Chọn độ dốc --</option>
+                        <option value="upsloping" {{ 'selected' if request and request.form.slope == 'upsloping' }}>Đi lên (upsloping)</option>
+                        <option value="flat" {{ 'selected' if request and request.form.slope == 'flat' }}>Đi ngang (flat)</option>
+                        <option value="downsloping" {{ 'selected' if request and request.form.slope == 'downsloping' }}>Đi xuống (downsloping)</option>
+                    </select>
+                </div>
+                 <div class="form-group">
+                    <label for="thal">Kết quả Thalassemia (thal):</label>
+                    <select id="thal" name="thal" required>
+                        <option value="" disabled {{ 'selected' if not request or not request.form.thal }}>-- Chọn kết quả Thal --</option>
+                        <option value="normal" {{ 'selected' if request and request.form.thal == 'normal' }}>Bình thường (normal)</option>
+                        <option value="fixed defect" {{ 'selected' if request and request.form.thal == 'fixed defect' }}>Khiếm khuyết cố định (fixed defect)</option>
+                        <option value="reversable defect" {{ 'selected' if request and request.form.thal == 'reversable defect' }}>Khiếm khuyết đảo ngược (reversable defect)</option>
+                    </select>
+                </div>
+            </div>
+
+            <input type="submit" value="Dự đoán Nguy cơ">
+        </form>
+
+        {% if error %}
+            <div class="error">
+                Lỗi: {{ error }}
+            </div>
+        {% endif %}
+
+        {% if prediction is defined and prediction is not none %}
+            {% set result_class = 'positive' if prediction == 1 else 'negative' %}
+            {% set result_text = 'NGUY CƠ CAO - Có khả năng mắc bệnh tim (Dự đoán = 1)' if prediction == 1 else 'NGUY CƠ THẤP - Ít có khả năng mắc bệnh tim (Dự đoán = 0)' %}
+            <div class="result {{ result_class }}">
+                <h2>Kết quả Dự đoán Nguy cơ:</h2>
+                <p style="font-size: 1.2em;"><strong>{{ result_text }}</strong></p>
+                <p class="model-info"><em>(Sử dụng mô hình: {{ model_name }} - Phiên bản: {{ model_version }} - Giai đoạn: {{ model_stage }})</em></p>
+            </div>
+        {% endif %}
+
+    </div>
+</body>
+</html>
